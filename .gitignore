@@ -1,2 +1,12 @@
+# Slurm logs
 *.err
 *.out
+logs/
+customer_results/
+
+# Local/ generated data
+data/
+
+# Experimental and scratch scripts
+test_scripts/
+
