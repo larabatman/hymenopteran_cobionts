@@ -46,3 +46,4 @@ Progress and API warning are written to stderr, and TSV results are written to s
 
 ## TOOLS VERSION
 module Python/3.9.5-GCCcore-10.3.0
+module R/4.2.1-foss-2021a
