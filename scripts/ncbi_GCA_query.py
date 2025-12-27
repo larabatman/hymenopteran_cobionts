@@ -3,9 +3,9 @@
 """
 This script aims at determining what raw sequencing data exists for a species associated with a GCA. 
 
-- GCA is used to get taxid and BioProject for the assembly context
+- GCA is used to resolve taxid of the assembly
 - Raw data is discovered independently, via taxid (ENA)
-- The coherence is then assessed via BioProject and BioSample overlap.
+- The coherence is then assessed via BioSample overlap.
 
 This way, all unreliable assembly to SRA linkages are avoided. 
 """
@@ -16,7 +16,7 @@ import json # to parse tthe NCBI/ ENA responses
 import sys 
 import urllib.request # to perform HTTP GET requests
 import urllib.parse # to encode the URL query parameters
-import time
+import time # to add some waiting time in between requests
 import random
 import urllib.error
 # Force IPv4 networking because HPC environment does not support IPv6, and sometimes urllib fails because of that.
@@ -40,7 +40,7 @@ def ncbi_assembly_metadata(gca):
     Input: gca, str
     Output: assembly bioproject, str 
     """
-    time.sleep(0.34) # 3 requests/s
+    time.sleep(0.34) # 3 requests/s, to allow NCBI to breath
     # GCA towards internal assembly UID: 
     # easearch
     params = {
@@ -76,13 +76,8 @@ def ncbi_assembly_metadata(gca):
         # data["result"] is a dict mapping uid to record dict, and contains many fields: doc["taxid"], doc["biosampleaccn"] and so on
     doc = data["result"][uid]
 
-    assembly_bioproject = None
-    if doc.get("gb_bioprojects"): #doc.get("gb_bioprojects") returns a list as [{"bioprojectaccn":"PRJEB78602", "bioprojectid":1143359}]
-        assembly_bioproject = doc["gb_bioprojects"][0]["bioprojectaccn"] #takes the first accession
-    
     return{
-        "taxid": doc.get("taxid"),
-        "assembly_bioproject": assembly_bioproject
+        "taxid": doc.get("taxid")
     }
 
 # Helper functions for ENA-related requests:
@@ -127,35 +122,45 @@ def ena_runs_from_taxid(taxid, max_retries = 3, base_sleep = 5):
     # Give up otherwise
     return []
 
-def collect(field, entries):
+# Helper
+def uniq(values):
     """
-    Input: list of entries
-    Output: set of unique bioproject strings, filtering out None/ empty
+    This function returns sorted, unique, non-empty values.
     """
-    return {e[field] for e in entries if e.get(field)}
+    return sorted({v for v in values if v})
             
 # Main 
 def main():
     # Read one species row for now
     script_dir = Path(__file__).resolve().parent # this makes an absolute path to the file containing this script
     infile = script_dir.parent / "species" / "Hymenopteran_genomes.csv" #this moves up one directory, and appends the path to the csv
+    
+    # Use the writer functions from csv to avoid discrepancies in column counts
+    writer = csv.writer(
+        sys.stdout, 
+        delimiter = "\t",
+        lineterminator = "\n"
+    )
+    # Print header once 
+    writer.writerow([
+            "species",
+            "assembly_accession",
+            "taxid",
+            "has_pacbio",
+            "has_hic",
+            "has_rnaseq",
+            "pacbio_runs",
+            "hic_runs",
+            "rnaseq_runs",
+            "pacbio_biosamples",
+            "hic_biosamples",
+            "shared_pacbio_hic_biosample",
+    ])
 
     with open(infile, newline="") as f: #open the csv
         reader = csv.DictReader(f) #yield each row as dict using header keys
         # row is dict like {"species": "Abia_cadens", "accession": "GCA_...", "taxid":"362089", ...}
     
-    # Print header once 
-        print(
-        "species\tassembly_accession\ttaxid\tassembly_bioproject\t"
-        "has_pacbio\thas_hic\thas_rnaseq\t"
-        "pacbio_runs\thic_runs\trnaseq_runs\t"
-        "pacbio_projects\thic_projects\t"
-        "pacbio_biosamples\thic_biosamples\t"
-        "shared_pacbio_hic_project\tshared_pacbio_hic_biosample\t"
-        "assembly_project_in_pacbio\tassembly_project_in_hic", 
-        flush = True
-        )
-
         for row in reader: 
             species = row["species"] # extract species
             gca = row["accession"] # extract GCA
@@ -164,14 +169,15 @@ def main():
 
             # 1) GCA to taxid and Bioproject
             taxid = None
-            assembly_project = None
             pacbio, hic, rnaseq = [], [], []
             try: 
                 meta = ncbi_assembly_metadata(gca) # Call NCBI, and retrieves taxid and assembly project
                 if meta is None:
                     raise ValueError("assembly not found")
-                taxid = meta["taxid"]
-                assembly_project = meta["assembly_bioproject"]
+                taxid = meta.get("taxid")
+                if not taxid:
+                        print(f"# No taxid for {gca}", file = sys.stderr)
+                        taxid = None
             except Exception as e:
                 print(f"# NCBI failed for {gca}: {e}", file = sys.stderr)
             
@@ -187,9 +193,7 @@ def main():
             for r in runs: # r is a dict from ENA
                 entry = {
                     "run": r["run_accession"], # ERR...
-                    "biosample": r.get("sample_accession"), #SAMEA...
-                    "bioproject": r.get("secondary_project_accession"), #intended PRJE
-                    "study": r.get("study_accession") or r.get("secondary_study_accession")
+                    "biosample": r.get("sample_accession") #SAMEA...
                 }
                 platform = r.get("instrument_platform", "")
                 strategy = r.get("library_strategy", "")
@@ -199,37 +203,31 @@ def main():
                     hic.append(entry)
                 if strategy.upper() == "RNA-SEQ":
                     rnaseq.append(entry)
-            #4) coherence checks
-            # Sets
-            pacbio_projects = collect("bioproject", pacbio)
-            hic_projects = collect("bioproject", hic)
+            pacbio_runs = uniq(e["run"] for e in pacbio)    
+            hic_runs = uniq(e["run"] for e in hic)  
+            rnaseq_runs = uniq(e["run"] for e in rnaseq)  
 
-            pacbio_biosamples = collect("biosample", pacbio)
-            hic_biosamples = collect("biosample", hic)
+            pacbio_samples = uniq(e["biosample"] for e in pacbio)
+            hic_samples = uniq(e["biosample"] for e in hic)
 
-            shared_pacbio_hic_project = bool(pacbio_projects & hic_projects)
-            shared_pacbio_hic_biosample = bool(pacbio_biosamples & hic_biosamples)
+            shared_sample = bool(set(pacbio_samples) & set(hic_samples))
 
-            assembly_project_in_pacbio = assembly_project in pacbio_projects if assembly_project else False
-            assembly_project_in_hic = assembly_project in hic_projects if assembly_project else False
-            # Output header once
-
-
-            print(
-                f"{species}\t{gca}\t{taxid}\t{assembly_project}\t"
-                f"{bool(pacbio)}\t{bool(hic)}\t{bool(rnaseq)}\t"
-                f"{','.join(e['run'] for e in pacbio)}\t"
-                f"{','.join(e['run'] for e in hic)}\t"
-                f"{','.join(e['run'] for e in rnaseq)}\t"
-                f"{','.join(sorted(pacbio_projects))}\t"
-                f"{','.join(sorted(hic_projects))}\t"
-                f"{','.join(sorted(pacbio_biosamples))}\t"
-                f"{','.join(sorted(hic_biosamples))}\t"
-                f"{shared_pacbio_hic_project}\t{shared_pacbio_hic_biosample}\t"
-                f"{assembly_project_in_pacbio}\t{assembly_project_in_hic}", 
-                flush = True
-            )
+            writer.writerow([
+                    species,
+                    gca,
+                    taxid or "",
+                    bool(pacbio_runs),
+                    bool(hic_runs),
+                    bool(rnaseq_runs),
+                    ",".join(pacbio_runs),
+                    ",".join(hic_runs),
+                    ",".join(rnaseq_runs),
+                    ",".join(pacbio_samples),
+                    ",".join(hic_samples),
+                    shared_sample
+            ])
             # Being polite and waiting before next species:
             time.sleep(3 + random.uniform(0, 2))
+
 if __name__ == "__main__":
     main()
