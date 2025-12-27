@@ -44,3 +44,5 @@ Progress and API warning are written to stderr, and TSV results are written to s
 | `assembly_project_in_pacbio`  | Assembly BioProject appears in PacBio data |
 | `assembly_project_in_hic`     | Assembly BioProject appears in Hi-C data   |
 
+## TOOLS VERSION
+module Python/3.9.5-GCCcore-10.3.0
