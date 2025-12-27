@@ -11,6 +11,8 @@
 # This script is a wrapper that launches query_ncbi_assembly.py
 set -euo pipefail 
 
+mkdir -p logs
+
 # Load Python module
 module load Python/3.9.5-GCCcore-10.3.0
 
