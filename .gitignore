@@ -10,3 +10,7 @@ data/
 # Experimental and scratch scripts
 test_scripts/
 
+# Intermediate files
+families/
+
+
