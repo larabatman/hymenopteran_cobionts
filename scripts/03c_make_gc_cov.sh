@@ -63,7 +63,7 @@ minimap2 -t "$SLURM_CPUS_PER_TASK" -ax map-hifi "$ASM" "$HIFI" \
 # Build BAM index reads.bam.bai for fast per-contig queries
 samtools index reads.bam
 
-# Per-contig coverafe with samtools
+# Per-contig coverage with samtools
 # samtools coverage summarizes coverage per reference sequence (per contig here). It output a header line and then one line per contig
 # The column 7 is the mean depth, and the output file is the raw samtools coverage output coverage.tsv
 samtools coverage reads.bam > coverage.tsv
