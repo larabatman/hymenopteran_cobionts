@@ -40,7 +40,7 @@ module load Kraken2/2.1.2-gompi-2021a
 
 # Convert GFA to FASTA when needed 
 # If FASTA file is not already existing, extract contig sequences from the GFA file. 
-# In GFA froamt, lines starting with "S" are segments/ contigs. Column 2 contain the contig name and column 3, the contig sequence. 
+# In GFA format, lines starting with "S" are segments/ contigs. Column 2 contain the contig name and column 3, the contig sequence. 
 if [[ ! -f "$FASTA" ]]; then
     echo "[INFO] Converting GFA to FASTA"
     awk '/^S/{print ">"$2"\n"$3}' "$GFA" > "$FASTA"
