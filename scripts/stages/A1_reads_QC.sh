@@ -9,8 +9,8 @@
 
 # Stage A: Assembly 
 # A1: General read QC
-# Overall HiFi statistics and Hi-C short reads cleaning and trimming
-# Output: fastqc reports and cleaned Hi-C R1 and R2
+# Overall HiFi and Hi-C statistics
+# Output: fastqc reports
 
 set -euo pipefail
 
