@@ -72,3 +72,32 @@ cd "'"$RUN_DIR"'"
 
 # Done
 echo "[INFO] Merqury finished for $SPECIES"
+
+# 5) Parse Merqury output
+# Paths
+QV_FILE="${MERQURY_DIR}/${SPECIES}.qv"
+COMP_FILE="${MERQURY_DIR}/${SPECIES}.completeness.stats"
+SUMMARY_FILE="${QC_DIR}/merqury_summary.tsv"
+
+
+echo "[INFO] Parsing Merqury output"
+
+if [[ -s "$QV_FILE" && -s "$COMP_FILE" ]]; then
+
+    # QV is column 4 in the .qv file
+    QV=$(awk 'NR==1 {print $4}' "$QV_FILE")
+
+    # completeness percentage is column 5 where column 2 == "all"
+    COMP=$(awk '$2=="all"{print $5}' "$COMP_FILE")
+
+    echo -e "species\tQV\tcompleteness_percent" > "$SUMMARY_FILE"
+    echo -e "${SPECIES}\t${QV}\t${COMP}" >> "$SUMMARY_FILE"
+
+    echo "[INFO] Merqury metrics parsed"
+
+else
+    echo "[WARN] Merqury files missing, writing NA"
+
+    echo -e "species\tQV\tcompleteness_percent" > "$SUMMARY_FILE"
+    echo -e "${SPECIES}\tNA\tNA" >> "$SUMMARY_FILE"
+fi
