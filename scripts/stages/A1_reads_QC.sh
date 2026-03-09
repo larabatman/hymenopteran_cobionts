@@ -31,7 +31,7 @@ HIC_CLEAN="reads/hic_clean/${SPECIES}"
 
 mkdir -p "$QC_DIR" "$HIC_CLEAN" logs
 
-HIFI_FILES=(reads/pacbio_hifi/${SPECIES}/*.fastq.gz)
+HIFI=(reads/pacbio_hifi/${SPECIES}/*.fastq.gz)
 
 HIC_R1="reads/hic/${SPECIES}/hic_R1.fastq.gz"
 HIC_R2="reads/hic/${SPECIES}/hic_R2.fastq.gz"
@@ -42,27 +42,23 @@ echo "[INFO] Using $THREADS threads"
 
 # Load modules
 module load FastQC/0.11.9-Java-11
-module load fastp/0.23.4-GCC-10.3.0
+#module load fastp/0.23.4-GCC-10.3.0
 module load SeqKit/2.6.1
 
 # 2) HiFi QC
 echo "[INFO] Running HiFi QC"
 
-seqkit stats "${HIFI_FILES[@]}" > "$QC_DIR/hifi_stats.tsv"
+ seqkit stats "${HIFI}" > "$QC_DIR/hifi_stats.tsv"
 
 fastqc \
   -t "$THREADS" \
   -o "$QC_DIR" \
-  "${HIFI_FILES[@]}"
+  "${HIFI}"
 
-seqkit fx2tab -l "${HIFI_FILES[@]}" \
-| awk '{print $2}' \
-| sort -n \
-> "$QC_DIR/hifi_read_lengths.txt"
 
 # End of script for ASM_MODE=="bp"
 if [[ "$ASM_MODE" == "bp" ]]; then
-    echo "[INFO] ASM_MODE=bp → skipping Hi-C QC"
+    echo "[INFO] ASM_MODE=bp: skipping Hi-C QC"
     echo "[INFO] HiFi QC completed successfully"
     exit 0
 fi
@@ -74,7 +70,7 @@ fastqc \
   -t "$THREADS" \
   -o "$QC_DIR" \
   "$HIC_R1" "$HIC_R2"
-
+  
 # Optional trim, but dangerous
 # fastp can desynchronize pairs → disabled for now
 
@@ -98,4 +94,4 @@ fastqc \
 #  "$HIC_CLEAN/hic_R2.clean.fastq.gz"
 
 # Done 
-echo "[INFO] Read QC completed successfully"
+echo "[INFO] A1 Read QC completed successfully"
