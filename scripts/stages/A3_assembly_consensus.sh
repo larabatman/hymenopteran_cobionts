@@ -75,11 +75,13 @@ echo "[INFO] Merqury finished for $SPECIES"
 
 # 5) Parse Merqury output
 # Paths
+QC_DIR="${WORKDIR}/results/${SPECIES}_stages/assembly_qc"
+MERQURY_DIR="${OUTDIR}/${SPECIES}"
 QV_FILE="${MERQURY_DIR}/${SPECIES}.qv"
 COMP_FILE="${MERQURY_DIR}/${SPECIES}.completeness.stats"
 SUMMARY_FILE="${QC_DIR}/merqury_summary.tsv"
 
-
+# Parse Merqury output 
 echo "[INFO] Parsing Merqury output"
 
 if [[ -s "$QV_FILE" && -s "$COMP_FILE" ]]; then
@@ -89,7 +91,7 @@ if [[ -s "$QV_FILE" && -s "$COMP_FILE" ]]; then
 
     # completeness percentage is column 5 where column 2 == "all"
     COMP=$(awk '$2=="all"{print $5}' "$COMP_FILE")
-
+    # write in summary file
     echo -e "species\tQV\tcompleteness_percent" > "$SUMMARY_FILE"
     echo -e "${SPECIES}\t${QV}\t${COMP}" >> "$SUMMARY_FILE"
 
