@@ -1,27 +1,36 @@
-#!/usr/bin/env bash
-#SBATCH --job-name=hifiasm_assembly
+#!/usr/bin/bash
+#SBATCH --job-name=reads_qc
 #SBATCH --partition=pibu_el8
-#SBATCH --time=24:00:00
-#SBATCH --cpus-per-task=32
-#SBATCH --mem=120G
-#SBATCH --output=logs/hifiasm_assembly_%j.out
-#SBATCH --error=logs/hifiasm_assembly_%j.err
+#SBATCH --time=12:00:00
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=32G
+#SBATCH --output=logs/reads_qc_%j.out
+#SBATCH --error=logs/reads_qc_%j.err
 
-# Stage A: Assembly
-# A2: hifiasm assembly, integrating Hi-C information for phasing when available
-# Outputs: hifiasm GFA and FASTA assemblies 
+# Stage A: Assembly 
+# A1: General read QC
+# Overall HiFi and Hi-C statistics
+# Output: fastqc reports
+
 set -euo pipefail
 
 # 1) Setup
 SPECIES="$1"
 ASM_MODE="$2"
 
-# Paths
-OUTDIR="assemblies/hifiasm_clean/${SPECIES}"
-PREFIX="${OUTDIR}/asm"
+echo "[INFO] job started on $(hostname)"
+echo "[INFO] species=$SPECIES"
+echo "[INFO] assembly mode=$ASM_MODE"
 
-mkdir -p "$OUTDIR" logs
-# Input
+# Paths
+WORKDIR="/data/projects/p2025-0083_mining_cobionts"
+cd "$WORKDIR"
+
+QC_DIR="results/${SPECIES}_stages/read_qc"
+HIC_CLEAN="reads/hic_clean/${SPECIES}"
+
+mkdir -p "$QC_DIR" "$HIC_CLEAN" logs
+
 HIFI=(reads/pacbio_hifi/${SPECIES}/*.fastq.gz)
 
 HIC_R1="reads/hic/${SPECIES}/hic_R1.fastq.gz"
@@ -29,59 +38,60 @@ HIC_R2="reads/hic/${SPECIES}/hic_R2.fastq.gz"
 
 THREADS=${SLURM_CPUS_PER_TASK:-1}
 
-echo "[INFO] Species: $SPECIES"
-echo "[INFO] Assembly mode: $ASM_MODE"
-echo "[INFO] HiFi reads: ${HIFI}"
-echo "[INFO] Output dir: $OUTDIR"
+echo "[INFO] Using $THREADS threads"
 
 # Load modules
-module load hifiasm/0.16.1-GCCcore-10.3.0
+module load FastQC/0.11.9-Java-11
+#module load fastp/0.23.4-GCC-10.3.0
+module load SeqKit/2.6.1
 
-# Checks
-[[ -s "$HIFI" ]] || { echo "ERROR: missing HiFi file $f"; exit 1; }
+# 2) HiFi QC
+echo "[INFO] Running HiFi QC"
 
-if [[ "$ASM_MODE" == "hic" ]]; then
-    [[ -s "$HIC_R1" ]] || { echo "ERROR: missing Hi-C R1 $HIC_R1"; exit 1; }
-    [[ -s "$HIC_R2" ]] || { echo "ERROR: missing Hi-C R2 $HIC_R2"; exit 1; }
+ seqkit stats "${HIFI}" > "$QC_DIR/hifi_stats.tsv"
+
+fastqc \
+  -t "$THREADS" \
+  -o "$QC_DIR" \
+  "${HIFI}"
+
+
+# End of script for ASM_MODE=="bp"
+if [[ "$ASM_MODE" == "bp" ]]; then
+    echo "[INFO] ASM_MODE=bp: skipping Hi-C QC"
+    echo "[INFO] HiFi QC completed successfully"
+    exit 0
 fi
 
-# 2) Run hifiasm with or without Hi-C raw reads 
-echo "[INFO] Running hifiasm"
+# 3) Hi-C QC
+echo "[INFO] Running Hi-C raw QC"
 
-if [[ "$ASM_MODE" == "hic" ]]; then
+fastqc \
+  -t "$THREADS" \
+  -o "$QC_DIR" \
+  "$HIC_R1" "$HIC_R2"
+  
+# Optional trim, but dangerous
+# fastp can desynchronize pairs → disabled for now
 
-    hifiasm \
-        -o "$PREFIX" \
-        -t "$THREADS" \
-        --h1 "$HIC_R1" \
-        --h2 "$HIC_R2" \
-        "$HIFI"
+# fastp \
+#   -i "$HIC_R1" \
+#   -I "$HIC_R2" \
+#   -o "$HIC_CLEAN/hic_R1.clean.fastq.gz" \
+#   -O "$HIC_CLEAN/hic_R2.clean.fastq.gz" \
+#   --detect_adapter_for_pe \
+#   --trim_poly_g \
+#   --thread "$THREADS" \
+#   --html "$QC_DIR/fastp_report.html" \
+#   --json "$QC_DIR/fastp_report.json"
 
-    GFA="${OUTDIR}/asm.hic.p_ctg.gfa"
-    FASTA="${OUTDIR}/asm.hic.p_ctg.fasta"
+#echo "[INFO] Running Hi-C QC after trimming"
 
-else
+#fastqc \
+#  -t "$THREADS" \
+#  -o "$QC_DIR" \
+#  "$HIC_CLEAN/hic_R1.clean.fastq.gz" \
+#  "$HIC_CLEAN/hic_R2.clean.fastq.gz"
 
-    hifiasm \
-        -o "$PREFIX" \
-        -t "$THREADS" \
-        "$HIFI"
-
-    GFA="${OUTDIR}/asm.bp.p_ctg.gfa"
-    FASTA="${OUTDIR}/asm.bp.p_ctg.fasta"
-
-fi
-
-echo "[INFO] Assembly finished"
-
-# 3) Convert GFA to FASTA
-
-[[ -s "$GFA" ]] || { echo "ERROR: GFA not found: $GFA"; exit 1; }
-
-# Grab GFA sequence segments starting with S
-if [[ ! -s "$FASTA" ]]; then
-    echo "[INFO] Converting GFA to FASTA"
-    awk '/^S/{print ">"$2"\n"$3}' "$GFA" > "$FASTA"
-fi
-
-echo "[INFO] A2 Assembly complete for $SPECIES"
+# Done 
+echo "[INFO] A1 Read QC completed successfully"
