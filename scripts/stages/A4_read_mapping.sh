@@ -41,6 +41,7 @@ minimap2 -t 12 -ax map-hifi "$ASM" $HIFI \
 
 samtools index "$OUTDIR/reads.bam"
 
+# Quick statistics
 samtools flagstat "$OUTDIR/reads.bam" > "$OUTDIR/mapping_flagstat.txt"
 samtools stats "$OUTDIR/reads.bam" > "$OUTDIR/mapping_stats.txt"
 
@@ -48,6 +49,12 @@ samtools stats "$OUTDIR/reads.bam" > "$OUTDIR/mapping_stats.txt"
 samtools coverage "$OUTDIR/reads.bam" > "$OUTDIR/coverage_per_contig.tsv"
 
 # Start position is on column 2 and end position on column 3 is multiplied by per-contig coverage on column 7 to obtain the total coverag, which is then divided by the total length to obtain the mean 
+# -v takes the shell variable $SPECIES inside awk as sp
+# Set output field as separator for species mean_depth
+# Compute interval between start and end with inclusive coordinates + 1
+# Add each contig length to the running total with total_len += len
+# Build length-weighted coverage sum: if length = 1000 and depth = 20, contribution = 20000
+# Finally, weighted mean cov = sum(length*depth)/sum(length)
 awk -v sp="$SPECIES" '
 BEGIN{
   OFS="\t"
