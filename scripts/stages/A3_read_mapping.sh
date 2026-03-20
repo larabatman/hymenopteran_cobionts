@@ -8,7 +8,8 @@
 #SBATCH --error=logs/read_mapping_%j.err
 
 # Stage A: Assembly 
-# A4: Read mapping validation
+# A3: Read mapping validation
+# Map HiFi filtered reads back to the assembly for mapping percentage and coverage estimates
 # Output: assembly statistics, read mapping metrics and coverage estimates
 
 # 1) Setup
@@ -21,8 +22,11 @@ ASM_MODE="$2"
 # Paths
 WORKDIR="/data/projects/p2025-0083_mining_cobionts"
 cd "$WORKDIR"
-ASM="assemblies/hifiasm_clean/${SPECIES}/asm.${ASM_MODE}.p_ctg.fasta"
-HIFI=reads/pacbio_hifi/${SPECIES}/*.fastq.gz
+ASM="assemblies/hifiasm/${SPECIES}/asm.${ASM_MODE}.p_ctg.fasta"
+
+QC_DIR="results/${SPECIES}_stages/read_qc"
+
+HIFI="results/${SPECIES}_stages/read_qc/hifi_filtered/hifi.filtered.fastq.gz"
 OUTDIR="results/${SPECIES}_stages/assembly_qc"
 mkdir -p "$OUTDIR"
 
@@ -32,7 +36,7 @@ module load SeqKit/2.6.1
 module load minimap2/2.20-GCCcore-10.3.0
 module load SAMtools/1.13-GCC-10.3.0
 
-# 2) Assembly stats
+# 2) Assembly stats TO DELETE EVENTUALLY
 seqkit stats -T "$ASM" > "$OUTDIR/assembly_basic_stats.tsv"
 
 # 3) Mapping
