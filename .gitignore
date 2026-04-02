@@ -3,9 +3,21 @@
 *.out
 logs/
 customer_results/
+.log
+.conda_pkgs
+.micromamba_envs
 
 # Local/ generated data
 data/
+
+# Test scripts
+scripts/archive
+script/helpers
+scripts/markerscan
+
+
+# Reference databases
+databases/
 
 # Experimental and scratch scripts
 test_scripts/
@@ -13,4 +25,39 @@ test_scripts/
 # Intermediate files
 families/
 
+# Reads
+reads/
+assemblies/
 
+# Intermediary results
+results/
+.nextflow/
+work/
+.apptainer_cache
+runs/
+busco_downloads/
+.nextflow.log*
+stage_test/
+
+# MarkerScan run tests
+markerscan_run/
+.snakemake/
+
+# Metator run tests 
+r_MetaTOR_Full/
+r/
+*.faa
+*.tblout
+.mamba/
+
+# Env
+envs/
+.conda_envs/
+bin/
+*.bam
+samtools_tmp_trash/
+*.log
+*.sif
+
+
+metagenomeassembly/
