@@ -61,3 +61,10 @@ samtools_tmp_trash/
 
 
 metagenomeassembly/
+
+sample_sheets/
+
+progress/
+
+scripts/env
+scripts/helpers
