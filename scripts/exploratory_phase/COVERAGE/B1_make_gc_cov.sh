@@ -7,8 +7,8 @@
 #SBATCH --output=logs/gc_cov_%j.out
 #SBATCH --error=logs/gc_cov_%j.err
 
-# Stage B: Orthogonal Evidence Layers
-# B1a: Compute per-contig mean coverage
+# =============================================================================
+# Stage B1: Compute per-contig mean coverage
 # Coverage-based partition for host backbone definition
 # Define host backbone with coverage as primary discriminator 
 # Compute mean_cov per contig
@@ -17,7 +17,7 @@
 
 set -euo pipefail 
 
-# 1) Setup 
+# Setup 
 # Project root
 WORKDIR="/data/projects/p2025-0083_mining_cobionts"
 cd "$WORKDIR"
@@ -46,7 +46,7 @@ module load SeqKit/2.6.1
 # samtools: used to sort/ index BAM and compute coverage per contig
 module load SAMtools/1.13-GCC-10.3.0
 
-# 2) Compute GC and length per contig
+# Compute GC and length per contig
 # SeqKit fx2tab outputs tabular stats per FASTA record:
 # -n: contig name
 # -l: length
@@ -57,20 +57,20 @@ seqkit fx2tab -n -l -g "$ASM" \
   | awk 'BEGIN{OFS="\t"; print "contig","len","gc"} {print $1,$2,$3}' \
   > "$OUTDIR/gc_len.tsv"
 
-# 3) Compute per contig mean coverage
+# Compute per contig mean coverage
 # Per-contig coverage with samtools
 # samtools coverage summarizes coverage per reference sequence (per contig here). It output a header line and then one line per contig
 # The column 7 is the mean depth, and the output file is the raw samtools coverage output coverage.tsv
 samtools coverage "$BAM" > "$OUTDIR/coverage.tsv"
 
-# Now, extract inly the contig name and mean depth:
+# Extract only the contig name and mean depth:
 # The awk logic prints the header "contig mean_cov", skips the first line which is the coverage.tsv header and prints contigs and mean depth
 # The output file cov.tsv contains: contig  mean_cov
 awk 'BEGIN{OFS="\t"; print "contig","mean_cov"}
      NR==1{next}
      {print $1,$7}' "$OUTDIR/coverage.tsv" > "$OUTDIR/cov.tsv"
 
-# 4) Merge GC and length with coverage into gc_cov.tsv
+# Merge GC and length with coverage into gc_cov.tsv
 # Join gc_len and cov.tsv by contig name which is column 1 in both. 
 # The first awk reads gc_len.tsv (NR==FNR is true only for the first file). It then stors, for each contig name, a[contig] = len<TAB>gc , then reads cov.tsv by skipping its header and printin conitg, (len, gc), mean_cov
 # The second awk adds the final header row. 

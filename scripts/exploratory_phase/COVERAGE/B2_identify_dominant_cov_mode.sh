@@ -7,16 +7,15 @@
 #SBATCH --output=logs/identify_dominant_cov_mode_%j.out
 #SBATCH --error=logs/identify_dominant_cov_mode_%j.err
 
-# Stage B: Orthogonal Evidence Layers
-# Coverage-based partition for host backbone definition
-# B2: Define host backbone with coverage as primary discriminator 
+# =============================================================================
+# Stage B2: Coverage modeling and host backbone definition
+# Define host backbone with coverage as primary discriminator 
 # Inputs: gc_cov.tsv
 # Output: coverage_classification.tsv, host_backbone.tsv and coverage_backbone_summary.tsv
 # Model host-like coverage weighted by contig length through MAD 
 
-# 1) Setup
+# Setup
 set -euo pipefail
-
 WORKDIR="/data/projects/p2025-0083_mining_cobionts"
 cd "$WORKDIR"
 
@@ -34,5 +33,5 @@ echo "[INFO] Output dir: $OUTDIR"
 # Load R
 module load R/4.2.1-foss-2021a
 
-# 2) Launch MAD COV analysis
-Rscript scripts/stages/exploratory_phase/COVERAGE/B2_identify_dominant_cov_mode.R "${SPECIES}" "${INPUT}" "${OUTDIR}"
+# Launch MAD COV analysis
+Rscript scripts/exploratory_phase/COVERAGE/B2_identify_dominant_cov_mode.R "${SPECIES}" "${INPUT}" "${OUTDIR}"
