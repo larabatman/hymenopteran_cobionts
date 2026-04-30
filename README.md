@@ -131,29 +131,26 @@ done
 
 ##### A1: Reads QC
 
+###### A1a: HiFi read QC
+
+
 Scripts:
-A1_reads_qc.sh and A1_reads_diagnostics.R perform filter the raw sequencing reads prior to assembly. 
+A1a_hifi_QC.sh and A1_reads_diagnostics.R filter the raw sequencing HiFi reads prior to assembly and is meant to be launched in parallel with A1b for Hi-C QC when relevant. 
 
 HiFi reads:
 - Raw statistics are extracted with seqkit stats
-- Length-filtered with fastplong: minimum 3 kbp, maximum 2X raw read N50 (auto-estimated or manually overriden for species flagged in curation)
+- Length-filtered with fastplong: minimum 3 kbp, maximum 2X raw read N50 kbp (auto-estimated or manually overriden for species flagged in curation)
 - Adapter trimming with fastplong
 - Post-filter statistics and FastQC report are generated
 - Raw and filtered read length distributions are extracted for the R diagnostics script 
 
-Hi-C reads under ASM_MODE = hic:
-- Pre-cleaning FastQC
-- Adapter trimming and quality filtering with fastp: minimal quality of called base Q20, minimal length of 50 bp, PE adapter detection 
-- Post-cleaning FastQC and seqkit statistics
-
 R diagnostics: produces before and after read length histograms with bindiwth set at 0.5 kbp for cross-species comparability, and prints N50, read count, and summary statistics. 
 
 Usage: 
-sbatch A1_reads_qc_sh <species> <asm_mode> [hifi_max_len]
+sbatch A1a_hifi_QC.sh <species> [hifi_max_len]
 
 Inputs:
 - PacBio HiFi reads: reads/pacbio_hifi/${SPECIES}/*.fastq.gz
-- (Optional) Hi-C reads: reads/hic/${SPECIES}/hic_R1.fastq.gz, hic_R2.fastq.gz
 
 Outputs: 
 - results/${SPECIES}_stages/read_qc/hifi_qc/hifi_raw_stats.tsv
@@ -162,12 +159,33 @@ Outputs:
 - results/${SPECIES}_stages/read_qc/hifi_qc/fastplong_report.{html,json}
 - results/${SPECIES}_stages/read_qc/hifi_qc/hifi_length_distribution_before_after.png
 - results/${SPECIES}_stages/read_qc/hifi_qc/hifi_length_cutoffs.tsv
+
+Tools: fastplong, FastQC, seqkit, R (ggplot2)
+
+###### A1b: Hi-C reads QC
+
+Scripts: 
+A1b_hic_qc.sh quality controls and filters Hi-C reads, meant to be launched in parallel with A1a. 
+
+Hi-C reads:
+- Pre-cleaning FastQC and seqkit stats
+- Adapter trimming and quality filtering with fastp: minimal quality of called base Q20, minimal length of 50 bp, PE adapter detection 
+- Post-cleaning FastQC and seqkit stats
+
+Usage:
+sbatch A1b_hic_qc.sh <species>
+
+Inputs:
+- Hi-C reads: reads/hic/${SPECIES}/hic_R1.fastq.gz, hic_R2.fastq.gz
+
+Outputs: 
 - reads/${SPECIES}/hic_clean/hic_R{1,2}.clean.fastq.gz (if Hi-C)
 - results/${SPECIES}_stages/read_qc/hic_qc/fastè_hic_report.{html,json}
 
-Tools: fastplong, fastp, FastQC, seqkit, R/ggplot2
+Tools: fastp, FastQC, seqkit
 
 Note: When multiple Hi-C technical replicates exist, they are concatenated into a single R1/R2 pair using concatenate_hic_replicates.sh prior to this stage, since additional information increases contact density and reduces noise. 
+
 
 ##### A2: hifiasm assembly 
 
@@ -244,16 +262,16 @@ Tools: R (dplyr, readr, stingr)
 
 #### Stage B: Orthogonal evidence, coverage-based host backbone 
 
-##### B1a: Per-contig GC, length and coverage
+##### B1: Per-contig GC, length and coverage
 
 Scripts: 
-B1a_gc_cov.sh computes per-contig sequence composition and coverage from the assembly and existing BAM. 
-1. GC and length: seqkit fx2tab extracts contig name, length and GC fractiton into gc_len.tsv
+B1_gc_cov.sh computes per-contig sequence composition and coverage from the assembly and existing BAM. 
+1. GC and length: seqkit fx2tab extracts contig name, length and GC fraction into gc_len.tsv
 2. Coverage: samtools coverage on the BAM from A3 writes to coverage.tsv, which is parsed to retain contig name and mean depth to cov.tsv
 3. Merge: an awk join on contig name produces the final gc_cov.tsv
 
 Usage_
-sbatch B1a_gc_cov.sh <species> <asm_mode>
+sbatch B1_gc_cov.sh <species> <asm_mode>
 
 Inputs:
 - Assembly: assemblies/hifiasm/${SPECIES}/asm.{bp,hic}.p_ctg.fasta
@@ -271,21 +289,21 @@ Output:
 
 Tools: seqkit, samtools 
 
-##### B1b: Coverage modeling and host backbone definition
+##### B2: Coverage modeling and host backbone definition
 
 Scripts: 
-B1b_run_identify_dominant_cov_mode.sh and B1b_identify_dominant_cov_mode.R define the host backbone by modeling the coverage distribution with a length-weighted Median Absolute Deviation (MAD) approach. The rationale is that the majority of assembled DNA is host, such that the coverage median approximates host depth, and MAD provides a robust spread estimate. 
+B2_identify_dominant_cov_mode.sh and B2_identify_dominant_cov_mode.R define the host backbone by modeling the coverage distribution with a length-weighted Median Absolute Deviation (MAD) approach. The rationale is that the majority of assembled DNA is host, such that the coverage median approximates host depth, and MAD provides a robust spread estimate. 
 
 Method: 
 1. Log-transform mean coverage (log10 with e = 1e-6 for zeros)
 2. Compute length-weigthed median (host coverage center)
-3. Compute length-weighted MAD with nomal consistency constant (1.4826)
+3. Compute length-weighted MAD with normal consistency constant (1.4826)
 4. Classify contigs by absolute z-score:
 - |z| < 2: host_like
 - 2 ≤ |z| < 4: ambiguous
 - |z| ≥ 4: coverage_outlier
 - |z| > 6: additional is_extreme flag
-5. Direction is annotated as high. low or neutral 
+5. Direction is annotated as high, low or neutral 
 
 Usage: 
 sbatch B1b_run_identify_dominant_cov_mode.sh <species>
@@ -297,6 +315,8 @@ Outputs:
 - results/${SPECIES}_stages/host_backbone/coverage_classification.tsv is the full table with z-scores and classes
 - results/${SPECIES}_stages/host_backbone/host_backbone.tsv are the host-like contigs only
 - results/${SPECIES}_stages/host_backbone/coverage_backbone_summary.tsv
+- results/${SPECIES}_stages/host_backbone/bloplot_covergae_class.png for a base GC-vs-coverage blobplot
+- results/${SPECIES}_stages/host_bakcbone/coverage_histogram.png for coverage distirbution with MAD median line 
 
 | Column | Description |
 | ----- | ----- |
@@ -307,14 +327,14 @@ Outputs:
 | n_backbone | Number of host-like contigs |
 | percent_backbone| % of assembly bp in host backbone |
 
-Tools: R (dplyr, readr, matrixStats)
+Tools: R (dplyr, readr, matrixStats, ggplot2)
 
 #### Stage C: Orthogonal evidence, BUSCO marker gene analysis
 
 ##### C1: BUSCO runs
 
 Scripts:
-C1_busco.sh runs BUSCO in genome mode against three lineage databases to detect conserved marker genes on each contig. The logic is that Hymenoptera and Arthropoda hist anochor host contigs while Bacteria hits flag potential cobionts. Contigs carrying both sets of marker are candidates for lateral gene transfer or host-integrated cobionts. 
+C1_busco.sh runs BUSCO in genome mode against three lineage databases to detect conserved marker genes on each contig. The logic is that Hymenoptera and Arthropoda hist anchor host contigs while Bacteria hits flag potential cobionts. Contigs carrying both sets of marker are candidates for lateral gene transfer or host-integrated cobionts. 
 Three lineage databases are used: 
 - hymenoptera_odb10 as strong host anchors
 - arthropoda_odb10 as supportive host anchors 
@@ -334,15 +354,16 @@ Tools: BUSCO
 ##### C2: Unified BUSCO analysis
 
 Scripts:
-C2_run_busco_analysis.sh and C2_busco_analysis.R consolidate contig-leve BUSCO collapse, anchor validation against the coverage backbone and all blobplot generation. 
+C2_run_busco_analysis.sh and C2_busco_analysis.R consolidate contig-level BUSCO collapse, anchor validation against the coverage backbone and all blobplot generation. 
 
-1. Contig-level collapse: reads the three full_table.tsv files using a robust parser that handles broken TSV formatting. For each contig, computes total BUSCO hits, per-lineage counts and presence flags, status breakdown (Complete, Fragmented, DUplicated) per lineage, and funcitonal annotations (BUSCO gene descriptions per lineage). The result is merged with the coverage classification table from B1b. 
+1. Contig-level collapse: reads the three full_table.tsv files using a robust parser that handles broken TSV formatting. For each contig, computes total BUSCO hits, per-lineage counts and presence flags, status breakdown (Complete, Fragmented, Duplicated) per lineage, and functional annotations (BUSCO gene descriptions per lineage). The result is merged with the coverage classification table from B2.
 
 2. Anchor validation: assigns anchor tiers to each contig based on BUSCO signal:
-- strong_hymenoptera for contigs that vahe hymenoptera BUSCO hits
+- strong_hymenoptera for contigs that have hymenoptera BUSCO hits
 - supportive_arthtropoda for contigs that have arthropoda but not hymenoptera hits
 - none for contigs without host markers
 It also cross-tabulates anchor type and coverage class with bacterial signal and coverage class to assess whether BUSCO-positive host contigs fall within the expected host coverage range and whether bacterial BUSCO contigs are enriched among coverage outliers. 
+
 3. Blobplots: all plots use log10(mean_cov) on y-axis and GC% on x-axis, with point size proportional to log10(contig_length). Filters applied: mean_cov > 0, len > 0 and GC between 13 and 80 %. 
 
 | Plot | Description |
@@ -463,3 +484,19 @@ Tools: R (dplyr, readr, ggplot2)
 
 # TOOLS AND VERSIONS
 
+| Tool | Version | Source | 
+| Python |  3.9.5 | GCCcore-10.3.0 |
+| R | 4.2.1 | foss-2021a |
+| hifiasm | 0.16.1 |  GCCcore-10.3.0 |
+| SeqKit | 2.6.1 | module |
+| Kraken2 | 2.1.2 | gompi-2021a |
+| minimap2 | 2.20 | GCCcore-10.3.0 |
+| SAMtools| 1.13 | GCC-10.3.0 |
+| BUSCO | 5.4.2 | foss-2021a
+| FastQC | 0.11.9 | Java-11 |
+| fastp | 0.23.4 | GCCC-10--3-0 |
+| EDTA | 2.2 | Apptainer container |
+| RepeatMasker | | 4.1.5 | foss-2021a |
+| TRF | 4.09.1 | GCC-10.3.0 |
+| Nextflow | | isolated environment, Java 17.0.6 |
+ 
