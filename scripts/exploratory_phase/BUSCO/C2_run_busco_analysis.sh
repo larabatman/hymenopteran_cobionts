@@ -13,16 +13,16 @@
 #
 # Requires: C1_busco.sh completed + B1b coverage classification
 # Usage: sbatch C2_run_busco_analysis.sh <species>
-# =============================================================================
 
 set -euo pipefail
 
+# Setup
 SPECIES="$1"
 
 WORKDIR="/data/projects/p2025-0083_mining_cobionts"
 cd "$WORKDIR"
 
-# ── Inputs ──
+# Inputs
 BUSCO_HYM="results/${SPECIES}_stages/busco/${SPECIES}_busco_hymenoptera/run_hymenoptera_odb10/full_table.tsv"
 BUSCO_ARTH="results/${SPECIES}_stages/busco/${SPECIES}_busco_arthropoda/run_arthropoda_odb10/full_table.tsv"
 BUSCO_BACT="results/${SPECIES}_stages/busco/${SPECIES}_busco_bacteria/run_bacteria_odb10/full_table.tsv"
@@ -31,7 +31,7 @@ COV="results/${SPECIES}_stages/host_backbone/coverage_classification.tsv"
 OUTDIR="results/${SPECIES}_stages/busco_analysis"
 mkdir -p "$OUTDIR"
 
-# ── Checks ──
+# Sanity checks
 for f in "$BUSCO_HYM" "$BUSCO_ARTH" "$BUSCO_BACT" "$COV"; do
     [[ -s "$f" ]] || { echo "[ERROR] Missing: $f" >&2; exit 1; }
 done
@@ -44,7 +44,7 @@ echo "=============================="
 
 module load R/4.2.1-foss-2021a
 
-Rscript scripts/stages/C2_busco_analysis.R \
+Rscript scripts/exploratory_phase/BUSCO/C2_busco_analysis.R \
     "$SPECIES" \
     "$BUSCO_HYM" \
     "$BUSCO_ARTH" \
