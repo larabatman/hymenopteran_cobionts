@@ -10,45 +10,57 @@
 # =============================================================================
 # Stage D3: Unified repeat element analysis
 # Parses EDTA GFF3 + RepeatMasker + TRF, produces 3 blobplots and summaries.
-#
-# Requires: D1_edta.sh + D2_rm_trf.sh completed + B1b coverage classification
+# It costructs all the file paths from SPECIES + ASM_MODE, verifies every input
+# exists and calls the R script that performs the blobplots and summaries. 
+# The <prfix> used here is always the FASTA filename as in asm.hic.p_ctg.fasta
+# as both EDTA and RM name their outpurs after the input file.
+
+# Requires: D1_edta.sh + D2_rm_trf.sh completed + B2 coverage classification
 # Usage: sbatch D3_run_repeat_analysis.sh <species> <asm_mode>
-# =============================================================================
 
 set -euo pipefail
 
+# Same arguments as in D1
 SPECIES="$1"
 ASM_MODE="$2"
 
 WORKDIR=/data/projects/p2025-0083_mining_cobionts
 cd "$WORKDIR"
 
+# Assembly paths and basename
 GENOME="assemblies/hifiasm/${SPECIES}/asm.${ASM_MODE}.p_ctg.fasta"
 PREFIX="$(basename "$GENOME")"
 
-# ── Inputs ──
+# Input file paths: each tool names its output after the input FASTA, with its oen suffix
+# EDTA adds ".mod.EDTA.TEanno.gff3" to the FASTA basename
 EDTA_GFF3="results/${SPECIES}_stages/edta/${PREFIX}.mod.EDTA.TEanno.gff3"
+# RM adds ".out" to the FASTA basename
 RM_OUT="results/${SPECIES}_stages/repeat_masking/repeatmasker/${PREFIX}.out"
+# TRF embeds the paramters in the filename
 TRF_DAT="results/${SPECIES}_stages/repeat_masking/trf/${PREFIX}.2.7.7.80.10.50.500.dat"
+# Coverage classification from B2 stage
 COV="results/${SPECIES}_stages/host_backbone/coverage_classification.tsv"
-
+# Output directory
 OUTDIR="results/${SPECIES}_stages/repeat_analysis"
 mkdir -p "$OUTDIR"
 
-# ── Checks ──
+# Checks that all files exist
 for f in "$GENOME" "$EDTA_GFF3" "$RM_OUT" "$TRF_DAT" "$COV"; do
     [[ -s "$f" ]] || { echo "[ERROR] Missing: $f" >&2; exit 1; }
 done
 
+# Run analysis
 echo "=============================="
 echo "D3 Unified repeat analysis"
 echo "Species: $SPECIES | Mode: $ASM_MODE"
 echo "Output:  $OUTDIR"
 echo "=============================="
 
+# Load R 
 module load R/4.2.1-foss-2021a
 
-Rscript scripts/stages/exploratory_phase/REPETITIVE_ELEMENTS/D3_repeat_analysis.R \
+# Call R script on all 7 positional arguments
+Rscript scripts/exploratory_phase/REPETITIVE_ELEMENTS/D3_repeat_analysis.R \
     "$SPECIES" \
     "$EDTA_GFF3" \
     "$RM_OUT" \
