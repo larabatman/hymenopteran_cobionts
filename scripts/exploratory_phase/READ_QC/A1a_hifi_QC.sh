@@ -13,9 +13,7 @@
 # read length extraction + R diagnostics plot
 #
 # Usage: sbatch A1a_hifi_qc.sh <species> [hifi_max_len]
-#   hifi_max_len : max HiFi read length in bp (optional)
-#                  if not provided, estimated automatically as 2x raw read N50
-# =============================================================================
+#   hifi_max_len : max HiFi read length in bp (optional). If not provided, estimated automatically as 2x raw read N50
 
 set -euo pipefail
 

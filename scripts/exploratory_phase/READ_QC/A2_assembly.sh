@@ -7,19 +7,18 @@
 #SBATCH --output=/data/projects/p2025-0083_mining_cobionts/logs/hifiasm_assembly_%j.out
 #SBATCH --error=/data/projects/p2025-0083_mining_cobionts/logs/hifiasm_assembly_%j.err
 
-# Stage A: Assembly
-# A2: hifiasm assembly
+# =============================================================================
+# Stage A2: hifiasm assembly
 # Assemble filtered HiFi reads, exploiting Hi-C contact information for phasing when available
 # Supports:
 #   - HiFi-only assembly (ASM_MODE=bp)
 #   - HiFi + Hi-C assembly (ASM_MODE=hic)
 # It converts the primary GFA outputed by hifiasm to FASTA and produces basic assemblies statistics
-#
 # Usage: sbatch A2_hifiasm.sh <species> <asm_mode>
 
 set -euo pipefail
 
-# 1) Setup
+# Setup
 # Arguments
 SPECIES="$1"
 ASM_MODE="$2"
@@ -55,7 +54,7 @@ for f in "${HIFI[@]}"; do
     [[ -s "$f" ]] || { echo "[ERROR] Missing or empty HiFi file: $f"; exit 1; }
 done
 
-# 2a) HiFi-only assembly
+# HiFi-only assembly
 if [[ "$ASM_MODE" == "bp" ]]; then
     echo "[INFO] Running HiFi-only assembly"
     hifiasm \
@@ -67,7 +66,7 @@ if [[ "$ASM_MODE" == "bp" ]]; then
     FASTA="${PREFIX}.bp.p_ctg.fasta"
 fi
 
-# 2b) HiFi + Hi-C assembly
+# HiFi + Hi-C assembly
 if [[ "$ASM_MODE" == "hic" ]]; then
     [[ -s "$HIC_R1" ]] || { echo "[ERROR] Missing or empty Hi-C R1: $HIC_R1"; exit 1; }
     [[ -s "$HIC_R2" ]] || { echo "[ERROR] Missing or empty Hi-C R2: $HIC_R2"; exit 1; }
@@ -84,12 +83,13 @@ if [[ "$ASM_MODE" == "hic" ]]; then
     FASTA="${PREFIX}.hic.p_ctg.fasta"
 fi
 
-# 3) Convert GFA to FASTA
+# Convert GFA to FASTA
+# awk command grabs lines contianing the sequences (S) in the GFA file
 echo "[INFO] Converting GFA to FASTA"
 [[ -s "$GFA" ]] || { echo "[ERROR] GFA missing or empty: $GFA"; exit 1; }
 awk '/^S/{print ">"$2"\n"$3}' "$GFA" > "$FASTA"
 
-# 4) Assembly stats
+# Assembly stats
 echo "[INFO] Assembly stats"
 seqkit stats -T "$FASTA" > "${OUTDIR}/assembly_basic_stats.tsv"
 cat "${OUTDIR}/assembly_stats.tsv"
