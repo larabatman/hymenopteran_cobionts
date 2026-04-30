@@ -14,6 +14,8 @@
 # Cobionts, at higher or lower abundance, appear at different coverage. 
 # Modelling that host coverage cluster staitsitcally to draw boundary and label host vs non-host 
 
+# Does not assume coverage distribution to be normal, but uses median and AD for mixture of distributions
+# Normality is assumed when scaling the MAD to make z-score thresholds interpretable
 
 library(dplyr)
 library(readr)
