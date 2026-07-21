@@ -9,10 +9,10 @@
 #
 # Usage:
 #   Rscript B1b_identify_dominant_cov_mode.R <SPECIES> <GC_COV_TSV> <OUTDIR>
-# After assembly: mixed contigs from host genome and potential cobionts. 
+# After assembly: mixed contigs from host genome and potential cobionts.
 # Host contigs will cluster together in coverage space: they are all replicated once per cell, and should have the same sequencing depth.
-# Cobionts, at higher or lower abundance, appear at different coverage. 
-# Modelling that host coverage cluster staitsitcally to draw boundary and label host vs non-host 
+# Cobionts, at higher or lower abundance, appear at different coverage.
+# Modelling that host coverage cluster staitsitcally to draw boundary and label host vs non-host
 
 # Does not assume coverage distribution to be normal, but uses median and AD for mixture of distributions
 # Normality is assumed when scaling the MAD to make z-score thresholds interpretable
@@ -37,12 +37,17 @@ NORM <- 1.4826  # MAD consistency constant for normal distribution
 
 # 1) Coverage modeling weighted by contig length
 # Filter out >= 0 mean_cov, NA lengths and negative or 0 lengths
-# Log10-transform the raw coverage as it is right-skewed and spans orders of magnitudes 
+# Log10-transform the raw coverage as it is right-skewed and spans orders of magnitudes
 # On a linear scale, the host cluster gets copressed and outliers dominate
 # Avoid small error to avoid log10(0) = - Inf for any 0-cov contigs that survied the filter
+n_raw <- nrow(gc_cov)
 gc_cov <- gc_cov %>%
-  filter(!is.na(mean_cov), mean_cov >= 0, !is.na(len), len > 0) %>%
-  mutate(logcov = log10(mean_cov + EPS))
+  filter(!is.na(mean_cov), is.finite(mean_cov), mean_cov >= 0, !is.na(len), len > 0) %>%
+  mutate(logcov = log10(mean_cov + EPS)) %>%
+  filter(is.finite(logcov))   # guards against Inf coverage slipping through the filter above
+n_dropped <- n_raw - nrow(gc_cov)
+if (n_dropped > 0)
+  message(sprintf("[INFO] Dropped %d contig(s) with non-finite or invalid coverage before modelling.", n_dropped))
 
 logcov_vec <- gc_cov$logcov
 weights <- gc_cov$len
@@ -51,16 +56,27 @@ weights <- gc_cov$len
 # Assembly has many contigs of different lengths; length.weighted median finds the coverage calue such that half of the total assembly bp are below it and half are above it
 host_median <- weightedMedian(logcov_vec, w = weights, na.rm = TRUE)
 
+# Guard: a median must lie within the data range. A non-finite or out-of-range
+# centre indicates corrupt coverage input (e.g. an Inf mean_cov that slipped
+# through) -- abort rather than write a summary that back-transforms to Inf in the
+# band analysis. This is the invariant that would have caught the L. morio summary.
+if (!is.finite(host_median) ||
+    host_median < min(logcov_vec) || host_median > max(logcov_vec)) {
+  stop(sprintf(
+    "Host median log-coverage (%.4g) is non-finite or outside the observed range [%.4g, %.4g] for %s; aborting rather than writing a corrupt summary.",
+    host_median, min(logcov_vec), max(logcov_vec), SPECIES))
+}
+
 # Length-weighted MAD with normal consistency constant
 # Median Absolute Deviation measures the spread as standard deviation, but using medians instead of means, such that it is robust to outliers
-# Distirbution is not Gaussian, but tailed 
+# Distirbution is not Gaussian, but tailed
 abs_dev  <- abs(logcov_vec - host_median)
 # NORM constnat rescales MAD to be a consistent estimator of the standard deviation under a normal distirbution, meaning that if data was truly normal, host_mad = sd()
-# Makes the z-scores interpretable 
-host_mad <- weightedMedian(abs_dev, w = weights, na.rm = TRUE) * NORM 
+# Makes the z-scores interpretable
+host_mad <- weightedMedian(abs_dev, w = weights, na.rm = TRUE) * NORM
 
-if (host_mad == 0) {
-  stop("MAD is zero: coverage distribution too tight or invalid.")
+if (!is.finite(host_mad) || host_mad == 0) {
+  stop("MAD is non-finite or zero: coverage distribution too tight or invalid.")
 }
 
 
@@ -120,7 +136,7 @@ df_plot <- gc_cov %>% filter(mean_cov > 0, len > 0, gc >= 13, gc <= 80)
 # y: mean coverage
 # Point size: log10(contig length)
 # Fill color: coverage class
-# shape = 21: filled circle with a separate border color 
+# shape = 21: filled circle with a separate border color
 # pmax(len, 1) guards against log10(0) for any zero-length edge cases before size mapping
 # scale_y_log10() for y on log scale
 p <- ggplot(df_plot, aes(gc, mean_cov)) +
@@ -178,5 +194,3 @@ message("[INFO] Written: ", file.path(OUTDIR, "coverage_histogram.png"))
 write_tsv(gc_cov, file.path(OUTDIR, "coverage_classification.tsv"))
 write_tsv(host_backbone, file.path(OUTDIR, "host_backbone.tsv"))
 write_tsv(summary_tbl, file.path(OUTDIR, "coverage_backbone_summary.tsv"))
-
-message("Coverage backbone definition finished.")
