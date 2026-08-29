@@ -7,8 +7,6 @@
 #SBATCH --output=logs/read_mapping_%j.out
 #SBATCH --error=logs/read_mapping_%j.err
 
-# =============================================================================
-# Stage A3: Read mapping
 # Map filtered HiFi reads back to assembly for mapping rate and coverage
 # Usage: sbatch A3_read_mapping.sh <species> <asm_mode>
 
@@ -57,10 +55,7 @@ samtools coverage "$OUTDIR/reads.bam" > "$OUTDIR/coverage_per_contig.tsv"
 # END block runs once after all lines have been processed
 # prints species and mean_depth as header row of the output TSV, the comma being replaced by OFS set in BEGIN
 # print result row: sp = species passed in via -v, tl>0 ? tc/tl : "NA" is a guard if the total length is greater than 0, compute the weighted mean depth, otherwise prin "NA" to avoid error
-
 awk -v sp="$SPECIES" 'BEGIN{OFS="\t"}
 NR>1 { len=$3-$2+1; tl+=len; tc+=len*$7 }
 END  { print "species","mean_depth"; print sp, (tl>0 ? tc/tl : "NA") }
 ' "$OUTDIR/coverage_per_contig.tsv" > "$OUTDIR/coverage_summary.tsv"
-
-echo "[INFO] Read mapping QC complete for $SPECIES"

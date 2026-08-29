@@ -7,10 +7,8 @@
 #SBATCH --output=logs/summarize_QC_%j.out
 #SBATCH --error=logs/summarize_QC_%j.err
 
-# =============================================================================
-# Stage A4: Summarize assembly QC
 # Output: species-level and global QC summary tables
-# This script parses stage A assembly outputs and prepares a standardized QC table that is then consumed by the R summarization script.
+# This script parses stage A assembly outputs and prepares a standardized QC table that is then consumed by the R script.
 
 set -euo pipefail
 
@@ -23,9 +21,4 @@ cd "$WORKDIR"
 
 # Launch R summary
 module load R/4.2.1-foss-2021a
-
-echo "[INFO] Launching QC summarization"
-
 Rscript scripts/exploratory_stages/READ_QC/A4_summarize_QC.R "$SPECIES" "$WORKDIR"
-
-echo "[INFO] QC summary completed for $SPECIES"
