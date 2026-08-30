@@ -7,46 +7,41 @@
 #SBATCH --output=/data/projects/p2025-0083_mining_cobionts/logs/hifiasm_assembly_%j.out
 #SBATCH --error=/data/projects/p2025-0083_mining_cobionts/logs/hifiasm_assembly_%j.err
 
-
-# hifiasm assembly
-# Assemble filtered HiFi reads, exploiting Hi-C contact information for phasing when available
-# Supports:
-#  - HiFi-only assembly (ASM_MODE=bp)
-#  - HiFi + Hi-C assembly (ASM_MODE=hic)
-# It converts the primary GFA outputed by hifiasm to FASTA and produces basic assemblies statistics
-# Usage: sbatch A2_hifiasm.sh <species> <asm_mode>
+# This script launches hifiasm assembly on hifi clean reads, with two options: either HiC data present and helps assembly, either HiC data not available 
+# ASM_MODE=bp for no HiC, and ASM_MODE=hic when HiC is available 
+# Also converts the primary assembly output GFA to FASTA for downstream analysis
+# Usage:
+# sbatch A2_hifiasm.sh species ASM_MODE
 
 set -euo pipefail
 
-# Setup
 # Arguments
 SPECIES="$1"
 ASM_MODE="$2"
 
-# Paths
+# Working directory
 WORKDIR="/data/projects/p2025-0083_mining_cobionts"
 cd "$WORKDIR"
-
+# Out directory
 OUTDIR="assemblies/hifiasm/${SPECIES}"
+# Prefic for hifiasm
 PREFIX="${OUTDIR}/asm"
 
 mkdir -p "$OUTDIR" logs
-
-HIFI=(results/${SPECIES}_stages/read_qc/hifi_qc/hifi_filtered/*.fastq.gz)
-
-# Hi-C cleaned reads from A1
+# HiFi clean reads
+HIFI="results/${SPECIES}_stages/read_qc/hifi_qc/hifi_filtered/*.fastq.gz"
+# HiC clean reads
 HIC_R1="reads/hic_clean/${SPECIES}/hic_R1.clean.fastq.gz"
 HIC_R2="reads/hic_clean/${SPECIES}/hic_R2.clean.fastq.gz"
 
 THREADS="${SLURM_CPUS_PER_TASK:-1}"
-
-# Load modules
+# Modules
 module purge
 module load hifiasm/0.16.1-GCCcore-10.3.0
 module load SeqKit/2.6.1
 
-
-# HiFi-only assembly
+# If HiFi only assembly ASM_MODE==bp
+# define the GFA and FASTA files
 if [[ "$ASM_MODE" == "bp" ]]; then
     hifiasm \
         -o "${PREFIX}" \
@@ -57,7 +52,7 @@ if [[ "$ASM_MODE" == "bp" ]]; then
     FASTA="${PREFIX}.bp.p_ctg.fasta"
 fi
 
-# HiFi + Hi-C assembly
+# If HiFi and HiC reads: ASM_MODE==hic
 if [[ "$ASM_MODE" == "hic" ]]; then
     hifiasm \
         -o "${PREFIX}" \
@@ -70,10 +65,13 @@ if [[ "$ASM_MODE" == "hic" ]]; then
     FASTA="${PREFIX}.hic.p_ctg.fasta"
 fi
 
-# Convert GFA to FASTA
-# awk command grabs lines contianing the sequences (S) in the GFA file
+# Converting GFA to FASTA: awk to grab lines that contain the sequences in the GFA file
+# The lines that start with S contain the fasta sequence: 
+# /^S/ describes the pattern 
+# Field 2 of an S line is the segment name: prefix with > to make a FASTA header
+# And field 3 is the sequence
+# Add "\n" for new line between them
 awk '/^S/{print ">"$2"\n"$3}' "$GFA" > "$FASTA"
 
-# Assembly stats
+# Assembly statistics with seqkit
 seqkit stats -T "$FASTA" > "${OUTDIR}/assembly_basic_stats.tsv"
-cat "${OUTDIR}/assembly_stats.tsv"
