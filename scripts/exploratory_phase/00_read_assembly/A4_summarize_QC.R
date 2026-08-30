@@ -1,48 +1,35 @@
 #!/usr/bin/env Rscript
 
-# This R script merges assembly statistics per species and globally
+# R script to collect assembly statistics
+# Usage:
+# Rscript A4_summarize_QC.R species 
 
-library(dplyr)
 library(readr)
 library(stringr)
 
 args <- commandArgs(trailingOnly = TRUE)
-
-# Arguments
 SPECIES <- args[1]
-WORKDIR <- args[2]
 
+# Working directories
+WORKDIR <- "/data/projects/p2025-0083_mining_cobionts"
 QC_DIR <- file.path(WORKDIR, "results", paste0(SPECIES, "_stages"), "assembly_qc")
+ASM_DIR <- file.path(WORKDIR, "assemblies", "hifiasm", SPECIES)
 
-# 1) Basic assembly stats (seqkit stats)
-basic_stats <- read_tsv(file.path(QC_DIR, "assembly_basic_stats.tsv"),show_col_types = FALSE)
-assembly_size <- basic_stats$sum_len
-n_contigs <- basic_stats$num_seqs
-avg_len <- basic_stats$avg_len
+# Assembly statistics from A2 seqkit
+basic_stats <- read_tsv(file.path(ASM_DIR, "assembly_basic_stats.tsv"),show_col_types = FALSE)
 
-# 2) Mapping rate (samtools flagstat)
+# Mapping rate from samtools flagstat
 flagstat <- read_lines(file.path(QC_DIR, "mapping_flagstat.txt"))
 mapped_line <- flagstat[str_detect(flagstat, " mapped \\(")][1]
-mapped_pct <- str_extract(mapped_line, "[0-9.]+(?=%)") %>% as.numeric()
+mapped_pct <- as.numeric(str_extract(mapped_line, "[0-9.]+(?=%)"))
 
-# 3) Per-contig coverage (samtools coverage)
-depth_tbl  <- read_tsv(file.path(QC_DIR, "coverage_summary.tsv"), show_col_types = FALSE)
-mean_depth <- depth_tbl$mean_depth
-
-# 4) QC thresholds based on mapping rate
-# Mapping rate is important since coverage is a strong signal for the pipeline
-status <- case_when( mapped_pct < 95 ~ "FAIL_low_mapping", TRUE ~ "PASS")
-
-# 5) Build final table
-qc_row <- tibble(
+# Assembly QC table:
+qc_row <- data.frame(
   species = SPECIES,
-  assembly_size = assembly_size,
-  n_contigs = n_contigs,
-  avg_len = avg_len,
-  mapped_pct = mapped_pct,
-  mean_depth = mean_depth,
-  status = status
+  assembly_size = basic_stats$sum_len,
+  n_contigs = basic_stats$num_seqs,
+  avg_len = basic_stats$avg_len,
+  mapped_pct = mapped_pct
 )
 
-# 6) Write species specific table
-write_tsv( qc_row, file.path(QC_DIR, "assembly_qc_status.tsv"))
+write_tsv( qc_row, file.path(QC_DIR, "assembly_qc_summary.tsv"))
