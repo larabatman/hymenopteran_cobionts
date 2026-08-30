@@ -10,6 +10,8 @@
 # Pilot job for the NextFlow sanger-tol/metagenomeassembly pipeline 
 # SLURM directives above define the allocation that runs NextFlow, and then it submits its own SLORM hobs with specific resources from the NextFlow config file defined below
 # This is the variant without HiC: omits bin3c, metator and other hic parameters in the YAML
+# Usage:
+# sbatch run_full_binner_no_hic.sh species
 
 set -euo pipefail
 
