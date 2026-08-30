@@ -7,7 +7,7 @@
 #SBATCH --output=logs/gc_cov_%j.out
 #SBATCH --error=logs/gc_cov_%j.err
 
-# Make coverage partition for host backbone definition
+# Create a single table with contig, lentgth, GC and mean coverage for each contig
 # For each contig, compute its length and GC content from the assembly fasta and mearge into a single table gc_cov.tsv
 # Usage:
 # sbatch B1_make_gc_cov.sh species ASM_MODE==bp or ASM_MODE==hic
@@ -52,6 +52,5 @@ awk 'BEGIN{OFS="\t"; print "contig","mean_cov"} NR==1{next} {print $1,$7}' ${COV
 # For each contig name: store name[contig] = len tab gc
 # Read cov.tsv
 # Print contig  len gc  mean_cov
-
 awk 'BEGIN{OFS="\t"} NR==FNR{name[$1]=$2 OFS $3; next} FNR==1{next} ($1 in name){print $1, name[$1], $2}' "$OUTDIR/gc_len.tsv" "$OUTDIR/cov.tsv" \
   | awk 'BEGIN{OFS="\t"; print "contig","len","gc","mean_cov"} {print}' > "$OUTDIR/gc_cov.tsv"
