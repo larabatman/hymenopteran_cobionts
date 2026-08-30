@@ -39,8 +39,6 @@ export TMPDIR="/scratch/$USER/tmp_${SLURM_JOB_ID}"
 module purge
 module load Java/17.0.6
 
-# Directories
-# Create logs directory for SLURM output files.
 mkdir -p logs "$RUN_DIR"/{nf,logs,.nextflow,.apptainer_cache,work} "$OUTDIR" "$TMPDIR" "$APPTAINER_TMPDIR"
 
 export NXF_HOME="$RUN_DIR/.nextflow"

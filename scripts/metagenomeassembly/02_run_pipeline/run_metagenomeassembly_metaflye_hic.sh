@@ -55,7 +55,7 @@ export APPTAINER_CACHEDIR="${RUN_DIR}/.apptainer_cache"
 export NXF_SINGULARITY_CACHEDIR="${RUN_DIR}/.apptainer_cache"
 
 # Write input YAML
-# assembly: assembler metamdbg tag, but actually metaflye
+# assembly: assembler metamdbg tag, but actually metaflye and assembly: fasta points to the metaflye assembly
 cat > "${RUN_DIR}/nf/input.yaml" <<EOF
 id: ${SPECIES}
 
