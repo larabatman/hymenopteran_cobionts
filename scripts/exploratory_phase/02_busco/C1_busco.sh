@@ -7,44 +7,33 @@
 #SBATCH --output=logs/busco_%j.out
 #SBATCH --error=logs/busco_%j.err
 
-# =============================================================================
-# Stage C1: BUSCO marker gene detection
-# Run BUSCO against three lineage databases on the hifiasm assembly
-#   - hymenoptera_odb10 : strong host anchors
-#   - arthropoda_odb10  : supportive host anchors
-#   - bacteria_odb10    : cobiont / anti-host signal
-#
-# Usage: sbatch C1_busco.sh <species> <asm_mode>
+# Run BUSCO for conserved gene detection in three lineages: hymenoptera_odb10, arthropofa_odb10, bacteria_odb10
+# Usage:
+# sbatch C1_busco.sh species ASM_MODE==bp or ASM_MODE==hic
 
 set -euo pipefail
 
-# Setup
 # Arguments
 SPECIES="$1"
 ASM_MODE="$2"
 
-# Paths
+# Working directory
 WORKDIR="/data/projects/p2025-0083_mining_cobionts"
 cd "$WORKDIR"
-
+# Assembly files, fasta
 ASM="assemblies/hifiasm/${SPECIES}/asm.${ASM_MODE}.p_ctg.fasta"
+# Output directory
 BUSCO_OUT="results/${SPECIES}_stages/busco"
 THREADS="${SLURM_CPUS_PER_TASK:-8}"
 
 mkdir -p "$BUSCO_OUT" logs
-# Sanity check assembly existence
-[[ -s "$ASM" ]] || { echo "[ERROR] Assembly not found: $ASM" >&2; exit 1; }
 
 # Modules
 module purge
 module load BUSCO/5.4.2-foss-2021a
 
-echo "[INFO] Species: $SPECIES | Mode: $ASM_MODE"
-echo "[INFO] Assembly: $ASM"
-
-# Hymenoptera
-# genome mode
-echo "[INFO] Running BUSCO — hymenoptera_odb10"
+# BUSCO runs: in genome mode
+# hymenoptera_odb10
 busco \
     --in "$ASM" \
     --out "${SPECIES}_busco_hymenoptera" \
@@ -53,9 +42,7 @@ busco \
     --lineage hymenoptera_odb10 \
     --cpu "$THREADS" \
     -f
-
-# Arthropoda
-echo "[INFO] Running BUSCO — arthropoda_odb10"
+# arthropoda_odb10
 busco \
     --in "$ASM" \
     --out "${SPECIES}_busco_arthropoda" \
@@ -64,9 +51,7 @@ busco \
     --lineage arthropoda_odb10 \
     --cpu "$THREADS" \
     -f
-
-# Bacteria
-echo "[INFO] Running BUSCO — bacteria_odb10"
+# bacteria_odb10
 busco \
     --in "$ASM" \
     --out "${SPECIES}_busco_bacteria" \
@@ -75,5 +60,3 @@ busco \
     --lineage bacteria_odb10 \
     --cpu "$THREADS" \
     -f
-
-echo "[OK] BUSCO complete for $SPECIES"
