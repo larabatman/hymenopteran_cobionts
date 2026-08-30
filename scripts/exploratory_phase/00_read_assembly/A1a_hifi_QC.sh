@@ -7,28 +7,35 @@
 #SBATCH --output=/data/projects/p2025-0083_mining_cobionts/logs/hifi_qc_%j.out
 #SBATCH --error=/data/projects/p2025-0083_mining_cobionts/logs/hifi_qc_%j.err
 
-# fastplong filtering min 3kb, max 2x N50 + FastQC + read length extraction + R diagnostics plot
-#
-# Usage: sbatch A1a_hifi_qc.sh <species> [hifi_max_len]
-# hifi_max_len: max HiFi read length in bp. If not provided, estimated automatically as 2x raw read N50
+# This script filters the raw hifi reads with fastplong:
+# minimum 3000 bp long, maximum 2xN50 
+# FastQC report
+# Read and length extraction for R histograms in A1_reads_diagnostics
+# Usage:
+# sbatch A1a_hifi_qc.sh species  
 
 set -euo pipefail
 
+# Arguments
 SPECIES="$1"
+
+# Min and max lengths
 HIFI_MIN_LEN=3000
 HIFI_MIN_QUAL=20
 
-# Paths
+# Working directory
 WORKDIR="/data/projects/p2025-0083_mining_cobionts"
 cd "$WORKDIR"
 
+# Read directory
+HIFI=reads/pacbio_hifi/${SPECIES}/*.fastq.gz
+HIFI_FILTERED="${HIFI_CLEAN_DIR}/hifi.filtered.fastq.gz"
+THREADS="${SLURM_CPUS_PER_TASK:-1}"
+
+# Outdir: clean rean directory and plots in species directory
 HIFI_QC_DIR="results/${SPECIES}_stages/read_qc/hifi_qc"
 HIFI_CLEAN_DIR="${HIFI_QC_DIR}/hifi_filtered"
 mkdir -p "$HIFI_QC_DIR" "$HIFI_CLEAN_DIR" logs
-
-HIFI=$(ls reads/pacbio_hifi/${SPECIES}/*.fastq.gz)
-HIFI_FILTERED="${HIFI_CLEAN_DIR}/hifi.filtered.fastq.gz"
-THREADS="${SLURM_CPUS_PER_TASK:-1}"
 
 # Modules
 module purge
@@ -39,38 +46,31 @@ module load Anaconda3/2022.05
 
 FASTPLONG_ENV="${WORKDIR}/.conda_envs/fastplong"
 
-# RAW stats
-# -T: tab-separated output for consistent awk parsing downstream.
-# -a: include ALL statistics, column 13 is N50, used for the max cutoff.
-
+# Raw statistics: grab the N50 for the maximum using seqkit
+# -T tap separated output for awk parsing
+# -a includes all stats and column 13 is the N50
+# Output to hifi_raw_stats.tsv
 seqkit stats -T -a "$HIFI" > "${HIFI_QC_DIR}/hifi_raw_stats.tsv"
 
-# Max length from N50
-if [[ -n "${2:-}" ]]; then
-    HIFI_MAX_LEN="$2"
-else
-    # Read N50 from the stats file already written above, avoids a second pass over the raw data.
-    # -F '\t': tab separator to match seqkit stats -T output.
-    # NR==2: skip the header row.
-    # $13: column 13 in seqkit stats -T -a output is N50.
-    RAW_N50=$(seqkit stats -T "$HIFI" | awk -F '\t' 'NR==2 {print $13}')
-    HIFI_MAX_LEN=$(( RAW_N50 * 2 ))
-fi
+# Select max length: 2xN50 
+# From hifi_raw_stats.tsv:
+# -F '\t' specifies the tab separator of seqkit -T
+# NR==2 skips the header written by seqkit
+# columns 13 $13 is the N50
+RAW_N50=$(awk -F '\t' 'NR==2 {print $13}' "${HIFI_QC_DIR}/hifi_raw_stats.tsv")
+HIFI_MAX_LEN=$(( RAW_N50 * 2 ))
 
+# Extract read length for histogram:
+# In FASTQ, there are 4 lines: 
+# Line 1: header that starts with @ 
+# Line 2: sequence which is what we want awk to grab and read length with length($0)
+# Line 3: separator that starts with +
+# Line 4: quality string with a character for each base
+# NR==2 matches the second line in one file, but we need to match the second line in eery redor: NR%4==2 matches 2, 6, 10, 14 keeping the line if it is the second of every group of 4
+zcat "$HIFI" | awk 'NR%4==2 {print length($0)}' > "${HIFI_QC_DIR}/hifi_raw_read_lengths.txt"
 
-# Record all cutoffs for the R diagnostics script.
-echo -e "species\thifi_min_len\thifi_max_len" > "${HIFI_QC_DIR}/hifi_length_cutoffs.tsv"
-echo -e "${SPECIES}\t${HIFI_MIN_LEN}\t${HIFI_MAX_LEN}" >> "${HIFI_QC_DIR}/hifi_length_cutoffs.tsv"
-
-# Raw read lengths (for diagnostics plot)
-# awk 'NR%4==2': FASTQ is 4-line records; line 2 of each record is the sequence. length($0) = read length in bases.
-zcat "$HIFI" | awk 'NR%4==2 {print length($0)}' \
-    > "${HIFI_QC_DIR}/hifi_raw_read_lengths.txt"
-
-# fastplong filtering
-# fastplong applies both length and quality filters simultaneously.
-# --mean_qual: per-read mean Phred score threshold. Q20 = 99% base accuracy, appropriate for HiFi
-# --out: single output FASTQ going directly to reads/processed/
+# Clean raw reads: fastplong for length and quality
+# --mean_qual: Phred score threshold, Q20 keeps bases tha are 99% accurate
 conda run -p "$FASTPLONG_ENV" fastplong \
     --in "$HIFI" \
     --out "$HIFI_FILTERED" \
@@ -81,21 +81,14 @@ conda run -p "$FASTPLONG_ENV" fastplong \
     --html "${HIFI_QC_DIR}/fastplong_report.html" \
     --json "${HIFI_QC_DIR}/fastplong_report.json"
 
-# Filtered stats + FastQC 
-# seqkit stats on the filtered FASTQ, same flags as raw for consistent columns.
+# Extract filter stats with seqkit
 seqkit stats -T "$HIFI_FILTERED" > "${HIFI_QC_DIR}/hifi_filtered_stats.tsv"
-# FastQC: per-base and per-read quality overview of the filtered reads.
-# -t: parallel threads for FastQC's internal processing.
-# -o: output directory for the HTML report and zipped data.
+
+# Write FastQC report 
 fastqc -t "$THREADS" -o "$HIFI_QC_DIR" "$HIFI_FILTERED"
 
-# Filtered read lengths
-zcat "$HIFI_FILTERED" | awk 'NR%4==2 {print length($0)}' \
-    > "${HIFI_QC_DIR}/hifi_filtered_read_lengths.txt"
+# Extract clean read length for histograms
+zcat "$HIFI_FILTERED" | awk 'NR%4==2 {print length($0)}' > "${HIFI_QC_DIR}/hifi_filtered_read_lengths.txt"
 
 # Diagnostics plot
-Rscript scripts/exploratory_phase/00_read_assembly/A1_reads_diagnostics.R \
-    "$SPECIES" \
-    "${HIFI_QC_DIR}/hifi_raw_read_lengths.txt" \
-    "${HIFI_QC_DIR}/hifi_filtered_read_lengths.txt" \
-    "$HIFI_QC_DIR"
+Rscript scripts/exploratory_phase/00_read_assembly/A1_reads_diagnostics.R "$SPECIES" "${HIFI_QC_DIR}/hifi_raw_read_lengths.txt" "${HIFI_QC_DIR}/hifi_filtered_read_lengths.txt" "$HIFI_QC_DIR"
