@@ -58,7 +58,7 @@ export NXF_SINGULARITY_CACHEDIR="${RUN_DIR}/.apptainer_cache"
 # assembly: assembler is tagged metamdbg, but actually metaspades and assembly: fasta points to the metaspades assembly
 # pacbio: fasta: points to the Illumina cleaned reads
 cat > "${RUN_DIR}/nf/input.yaml" <<EOF
-id: ${SAMPLE_ID}
+id: ${SPECIES}
 
 assembly:
   assembler: metamdbg
@@ -208,7 +208,7 @@ trace {
 }
 
 EOF
-# Run pipeline with --minimum_hifi_perc_identity 90
+# Run pipeline with --minimum_contig_size 1500 and --minimum_hifi_perc_identity 90
 cd "${RUN_DIR}"
 nextflow run "${PIPELINE_DIR}" \
   -profile singularity \
