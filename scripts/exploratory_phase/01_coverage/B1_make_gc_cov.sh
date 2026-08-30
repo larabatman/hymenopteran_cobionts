@@ -7,81 +7,51 @@
 #SBATCH --output=logs/gc_cov_%j.out
 #SBATCH --error=logs/gc_cov_%j.err
 
-# =============================================================================
-# Stage B1: Compute per-contig mean coverage
-# Coverage-based partition for host backbone definition
-# Define host backbone with coverage as primary discriminator 
-# Compute mean_cov per contig
-
-# This script computes per-contig length and GC content from the assembly fasta, retrieves mean coverage and merges them into a single table: gc_cov.tsv
+# Make coverage partition for host backbone definition
+# For each contig, compute its length and GC content from the assembly fasta and mearge into a single table gc_cov.tsv
+# Usage:
+# sbatch B1_make_gc_cov.sh species ASM_MODE==bp or ASM_MODE==hic
 
 set -euo pipefail 
 
-# Setup 
-# Project root
+# Working directory
 WORKDIR="/data/projects/p2025-0083_mining_cobionts"
 cd "$WORKDIR"
 
-# Inputs
-# Sample identifier 
+# Arguments: 
 SPECIES="$1"
-# Assembly mode: either Hi-C information (hic) or not (bp)
 ASM_MODE="$2"
-# Path to primary contigs assembly FASTA, reference for extracting contig GC/ length stats and mapping reads to compute coverage
+# Primary contigs assembly fasta
 ASM="${WORKDIR}/assemblies/hifiasm/${SPECIES}/asm.${ASM_MODE}.p_ctg.fasta"
-# Path to BAM produced in A4
+# BAM file
 BAM="${WORKDIR}/results/${SPECIES}_stages/assembly_qc/reads.bam"
-
+# Coverage
+COV="results/${SPECIES}_stages/assembly_qc/coverage_per_contig.tsv"
 # Outputs 
 OUTDIR="${WORKDIR}/results/${SPECIES}_stages/gc_cov"
 mkdir -p "$OUTDIR"
 
-echo "[INFO] Assembly: $ASM"
-echo "[INFO] BAM reads: $BAM"
-echo "[INFO] Output dir: $OUTDIR"
-
-# Load modules
-# SeqKit is used to extract contig states (name, length, GC) from FASTA
+# Modules
 module load SeqKit/2.6.1
-# samtools: used to sort/ index BAM and compute coverage per contig
 module load SAMtools/1.13-GCC-10.3.0
 
-# Compute GC and length per contig
-# SeqKit fx2tab outputs tabular stats per FASTA record:
-# -n: contig name
-# -l: length
-# -g: GC content
-# The awk command sets output field separator to TAB, prints a header once and prints 3 columns per contig. 
-# The output file gc_len.tsv looks like: contig len gc
-seqkit fx2tab -n -l -g "$ASM" \
-  | awk 'BEGIN{OFS="\t"; print "contig","len","gc"} {print $1,$2,$3}' \
-  > "$OUTDIR/gc_len.tsv"
+# GC and length for each contig: seqkit fx2tab
+# -n for contig name
+# -l for length
+# -g for GC content
+# Piped to awk: "\t" tab field separator, print the header contig len gc and the three output columns for each contig
+# gc_len.tsv: contig  len gc
+seqkit fx2tab -n -l -g "$ASM" | awk 'BEGIN{OFS="\t"; print "contig","len","gc"} {print $1,$2,$3}'> "$OUTDIR/gc_len.tsv"
 
-# Compute per contig mean coverage
-# Per-contig coverage with samtools
-# samtools coverage summarizes coverage per reference sequence (per contig here). It output a header line and then one line per contig
-# The column 7 is the mean depth, and the output file is the raw samtools coverage output coverage.tsv
-samtools coverage "$BAM" > "$OUTDIR/coverage.tsv"
+# From samtools coverage: extract contig name and mean depth
+# awk: print header tab separated contig  mean_cov and print the two columns
+awk 'BEGIN{OFS="\t"; print "contig","mean_cov"} NR==1{next} {print $1,$7}' ${COV} > "$OUTDIR/cov.tsv"
 
-# Extract only the contig name and mean depth:
-# The awk logic prints the header "contig mean_cov", skips the first line which is the coverage.tsv header and prints contigs and mean depth
-# The output file cov.tsv contains: contig  mean_cov
-awk 'BEGIN{OFS="\t"; print "contig","mean_cov"}
-     NR==1{next}
-     {print $1,$7}' "$OUTDIR/coverage.tsv" > "$OUTDIR/cov.tsv"
+# Merge gc_len.tsv with cov.tsv by contig name, column 1 in both cases
+# First read gc_len.tsv: NR==NFR is true only for the first file 
+# For each contig name: store name[contig] = len tab gc
+# Read cov.tsv
+# Print contig  len gc  mean_cov
 
-# Merge GC and length with coverage into gc_cov.tsv
-# Join gc_len and cov.tsv by contig name which is column 1 in both. 
-# The first awk reads gc_len.tsv (NR==FNR is true only for the first file). It then stors, for each contig name, a[contig] = len<TAB>gc , then reads cov.tsv by skipping its header and printin conitg, (len, gc), mean_cov
-# The second awk adds the final header row. 
-# The final output file gc_civ.tsv has columns: contig  len gc  mean_cov
-awk 'BEGIN{OFS="\t"}
-     NR==FNR{a[$1]=$2 OFS $3; next}
-     FNR==1{next}
-     ($1 in a){print $1, a[$1], $2}' \
-  "$OUTDIR/gc_len.tsv" "$OUTDIR/cov.tsv" \
-| awk 'BEGIN{OFS="\t"; print "contig","len","gc","mean_cov"} {print}' \
-> "$OUTDIR/gc_cov.tsv"
-
-# Done
-echo "[INFO] Wrote: $OUTDIR/gc_cov.tsv"
+awk 'BEGIN{OFS="\t"} NR==FNR{name[$1]=$2 OFS $3; next} FNR==1{next} ($1 in name){print $1, name[$1], $2}' "$OUTDIR/gc_len.tsv" "$OUTDIR/cov.tsv" \
+  | awk 'BEGIN{OFS="\t"; print "contig","len","gc","mean_cov"} {print}' > "$OUTDIR/gc_cov.tsv"
