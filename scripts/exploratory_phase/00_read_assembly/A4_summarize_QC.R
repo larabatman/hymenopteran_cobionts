@@ -1,17 +1,16 @@
 #!/usr/bin/env Rscript
 
-# R script to collect assembly statistics
+# R script to collect assembly statistics, launched by A4_summarize_Qc.sh
 # Usage:
-# Rscript A4_summarize_QC.R species 
+# Rscript A4_summarize_QC.R species workdir
 
 library(readr)
 library(stringr)
 
 args <- commandArgs(trailingOnly = TRUE)
 SPECIES <- args[1]
-
+WORKDIR <- args[2]
 # Working directories
-WORKDIR <- "/data/projects/p2025-0083_mining_cobionts"
 QC_DIR <- file.path(WORKDIR, "results", paste0(SPECIES, "_stages"), "assembly_qc")
 ASM_DIR <- file.path(WORKDIR, "assemblies", "hifiasm", SPECIES)
 

@@ -7,8 +7,7 @@
 #SBATCH --output=logs/summarize_QC_%j.out
 #SBATCH --error=logs/summarize_QC_%j.err
 
-# Output: species-level and global QC summary tables
-# This script parses stage A assembly outputs and prepares a standardized QC table that is then consumed by the R script.
+# Summarize assembly statistics with Rscript
 
 set -euo pipefail
 
