@@ -19,7 +19,7 @@ dropped_tsv <- "placement_out/qc/dropped_markers.tsv"
 FLAG_FRAC <- 0.30
 
 qc <- read_tsv(one_og, show_col_types = FALSE) %>%
-  mutate(FLAG_FRAC = (dup + ambiguous) / n_mags, drop = frac_flagged >= FLAG_FRAC )
+  mutate(frac_flagged = (dup + ambiguous) / n_mags, drop = frac_flagged >= FLAG_FRAC )
 
 dropped <- qc %>% filter(drop) %>%
   transmute(og, n_mags, dup, ambiguous, frac_flagged = round(frac_flagged, 3), reason = sprintf("ambiguous/dup in >=%.0f%% of MAGs", 100 * FLAG_FRAC))
@@ -30,5 +30,5 @@ all_ogs  <- trimws(readLines(tree_ogs))
 all_ogs <- all_ogs[all_ogs != ""]
 # setdiff to choose the kept ogs: everything in all_ogs that is not in dropped
 keep_ogs <- setdiff(all_ogs, dropped$og)
-# Write the clean_tree_ogs.txt
+# Write the tree_ogs.clean.txt
 writeLines(keep_ogs, clean_ogs)
