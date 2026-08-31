@@ -5,7 +5,7 @@
 #SBATCH --mem=32G
 #SBATCH --job-name=nuwt_mag
 #SBATCH --output=/data/projects/p2025-0083_mining_cobionts/cobionts/nuwt_scan/logs/nuwt_mag_%j.out
-#SBATCH --error=/data/users/lland/cobionts/nuwt_scan/logs/nuwt_mag_%j.err
+#SBATCH --error=/data/projects/p2025-0083_mining_cobionts/cobionts/nuwt_scan/logs/nuwt_mag_%j.err
 
 # blastn the host assembly against the Wolbachia MAGs that was retrieved from it
 # Usage
