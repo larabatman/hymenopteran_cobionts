@@ -26,7 +26,7 @@ OUT_FASTA="${HMM_DIR}/og_representatives.fna"
 SCRIPT_DIR="${PROJECT_ROOT}/scripts/nuwt/04_annotation"
 EXTRACT_PY="${SCRIPT_DIR}/extract_og_representatives.py"
 
-module load Python/3.9.5-GCCcore-10.3.0
+module load Biopython/1.79-foss-2021a
 
 # For each OG, extract one representative sequence
 python3 "${EXTRACT_PY}" "${ALN_DIR}" "${OUT_FASTA}"
