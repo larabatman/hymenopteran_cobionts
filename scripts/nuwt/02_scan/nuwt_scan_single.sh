@@ -10,7 +10,8 @@
 # Run nhmmscan on the insect gneomes against the 2'647 Wolbachia HMM profiles
 # Usage:
 # sbatch nuwt_scan_single species assembly_path
-# dfam.tbl have 15 columns: 
+#
+# dfam.tbl has 15 columns: 
 # target name is the profile that matched, with the OG ID
 # acc is the accession registered inside the HMM file
 # query name i s the host sequence as a scaffold or contig from its assembly
