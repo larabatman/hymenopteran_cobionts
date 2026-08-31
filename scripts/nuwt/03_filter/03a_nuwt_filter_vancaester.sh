@@ -7,7 +7,6 @@
 #SBATCH --output=/data/projects/p2025-0083_mining_cobionts/cobionts/nuwt_scan/logs/nuwt_vanc_%j.out
 #SBATCH --error=/data/projects/p2025-0083_mining_cobionts/cobionts/nuwt_scan/logs/nuwt_vanc_%j.err
 
-# Filter each dfam.tbl against the reference database 
 # blastn the host assembly against the full Wolbachia reference blast database
 # Scaffold or contigs that match a reference at more than 99% over 80% of the contig length is treated as living Wolbachia contamination and not a nuwt
 # Usage:
