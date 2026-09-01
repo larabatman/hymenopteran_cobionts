@@ -28,4 +28,4 @@ source "$(conda info --base)/etc/profile.d/conda.sh"
 conda activate /data/projects/p2025-0083_mining_cobionts/.conda_envs/iqtree
 
 # Run IQTREE: -s for input alignment supermatrix, -m model, -B bootstraps, -o outgrops
-iqtree -s "${SUPERMATRIX}" -m GTR20+G4 -B 1000 -T "${SLURM_CPUS_PER_TASK}" -o "${OUTGROUPS}" --prefix "${PREFIX}"
+iqtree2 -s "${SUPERMATRIX}" -m GTR20+G4 -B 1000 -T "${SLURM_CPUS_PER_TASK}" -o "${OUTGROUPS}" --prefix "${PREFIX}"
